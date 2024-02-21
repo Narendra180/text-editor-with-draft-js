@@ -1,0 +1,33 @@
+.app-div {
+  height: 100vh;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.heading-and-save-btn-container {
+  display: flex;
+  justify-content: center;
+  position: relative;
+  margin-bottom: 1.25rem;
+}
+
+.heading-h1 {
+  margin: 1rem;
+  font-size: 1.5rem;
+}
+
+.save-btn-container {
+  height: 100%;
+  position: absolute;
+  right: 0;
+  display: flex;
+  align-items: center;
+}
+
+.editor-container {
+  flex: 1 1 0;
+  border: 1px solid rgb(39, 119, 216);
+  border-radius: 1rem;
+  padding: 1rem;
+}
