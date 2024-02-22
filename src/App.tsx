@@ -1,5 +1,6 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
-import { Editor, EditorState, RichUtils, DraftHandleValue, getDefaultKeyBinding, KeyBindingUtil, ContentState, ContentBlock, SelectionState, Modifier } from "draft-js";
+import { List } from "immutable";
+import { Editor, EditorState, RichUtils, DraftHandleValue, getDefaultKeyBinding, KeyBindingUtil, ContentState, ContentBlock, SelectionState, Modifier, genKey } from "draft-js";
 import 'draft-js/dist/Draft.css';
 import './App.css';
 
@@ -15,14 +16,27 @@ function App() {
   }
 
   useEffect(() => {
-    // console.log(editorState)
-    // const currentContent = editorState.getCurrentContent();
-    // const selectionState = editorState.getSelection();
-    // const anchorKey = selectionState.getAnchorKey();
-    // const currentContentBlock = currentContent.getBlockForKey(anchorKey);
-    // console.log(currentContentBlock.getText());
     console.log(editorState, editorState.getCurrentInlineStyle())
   }, [editorState]);
+
+  const handleEnterClick = (e: SyntheticKeyboardEvent, es: EditorState): DraftHandleValue => {
+    const contentState = es.getCurrentContent();
+    const newBlock = new ContentBlock({
+      key: genKey(),
+      type: 'unstyled',
+      text: '',
+      characterList: List()
+    });
+    const newBlockMap = contentState.getBlockMap().set(newBlock.getKey(), newBlock)
+    const modifiedState = EditorState.createWithContent(
+      ContentState.createFromBlockArray(
+        newBlockMap.toArray()
+      )
+    );
+    const newEditorState = EditorState.moveFocusToEnd(modifiedState);
+    setEditorState(newEditorState);
+    return "handled";
+  }
 
   const keyBindingFn = (e: SyntheticKeyboardEvent): string | null => {
     const { hasCommandModifier } = KeyBindingUtil;
@@ -53,7 +67,6 @@ function App() {
 
         // For Heading
         if(currentBlockText.length === 1 && currentBlockText === "#") {
-          console.log("inside if condition")
           const newState = RichUtils.toggleBlockType(editorState, "header-one");
           setEditorState(newState);
         } else if(currentBlockText.length > 1 && currentBlockText[0] === "#") {
@@ -73,6 +86,11 @@ function App() {
           const newEditorState = EditorState.moveFocusToEnd(modifiedEditorState);
           setEditorState(newEditorState);
           console.log(newEditorState);
+        }
+
+        // For Bold Text
+        if(currentBlockText.length === 1 && currentBlockText === "*") { 
+
         }
       }
       default: {
@@ -107,6 +125,7 @@ function App() {
           ref={editorRef} 
           onChange={setEditorState}
           editorState={editorState}       
+          handleReturn={handleEnterClick}
           handleKeyCommand={handleKeyCommand}
           keyBindingFn={keyBindingFn}
         />
