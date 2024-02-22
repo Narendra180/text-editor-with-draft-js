@@ -26,6 +26,14 @@
   align-items: center;
 }
 
+.save-btn {
+  border: none;
+  background-color: rgb(28, 116, 198);
+  padding: 0.625rem 1rem;
+  border-radius: 0.625rem;
+  color: white;
+}
+
 .editor-container {
   flex: 1 1 0;
   border: 1px solid rgb(39, 119, 216);
