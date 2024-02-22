@@ -1,3 +1,9 @@
+const customStyleMap = {
+  "red-text": {
+    "color": "red"
+  }
+}
+
 const BLOCK_TYPES = [
   {label: 'H1', style: 'header-one'},
   {label: 'H2', style: 'header-two'},
@@ -18,4 +24,4 @@ const INLINE_STYLES = [
   {label: 'Monospace', style: 'CODE'},
 ];
 
-export { BLOCK_TYPES, INLINE_STYLES };
+export { BLOCK_TYPES, INLINE_STYLES, customStyleMap };

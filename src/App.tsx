@@ -1,8 +1,9 @@
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { List } from "immutable";
-import { Editor, EditorState, RichUtils, DraftHandleValue, getDefaultKeyBinding, KeyBindingUtil, ContentState, ContentBlock, SelectionState, Modifier, genKey } from "draft-js";
+import { Editor, EditorState, RichUtils, DraftHandleValue, getDefaultKeyBinding, KeyBindingUtil, ContentState, ContentBlock, SelectionState, Modifier, genKey, DraftInlineStyle, convertToRaw, convertFromRaw } from "draft-js";
 import 'draft-js/dist/Draft.css';
 import './App.css';
+import { customStyleMap } from "./constants";
 
 type SyntheticKeyboardEvent = React.KeyboardEvent<{}>;
 
@@ -14,10 +15,6 @@ function App() {
     //@ts-ignore
     editorRef.current?.focus();
   }
-
-  useEffect(() => {
-    console.log(editorState, editorState.getCurrentInlineStyle())
-  }, [editorState]);
 
   const handleEnterClick = (e: SyntheticKeyboardEvent, es: EditorState): DraftHandleValue => {
     const contentState = es.getCurrentContent();
@@ -34,8 +31,40 @@ function App() {
       )
     );
     const newEditorState = EditorState.moveFocusToEnd(modifiedState);
-    setEditorState(newEditorState);
+    const inlineStyleArray = newEditorState.getCurrentInlineStyle().toArray();
+    const inlineStyleRemovedState = inlineStyleArray.reduce((editorState, ele) => {
+      return RichUtils.toggleInlineStyle(editorState, ele)
+    }, newEditorState);
+    setEditorState(inlineStyleRemovedState);
     return "handled";
+  }
+
+  useEffect(() => {
+    const rawJson = localStorage.getItem("draft-js-raw");
+    if(rawJson) {
+      const contentState = convertFromRaw(JSON.parse(rawJson));
+      const newEditorState = EditorState.createWithContent(contentState);
+      setEditorState(newEditorState);
+    }
+  }, [])
+
+  useEffect(() => {
+    // console.log({editorState, inlineStyle: editorState.getCurrentInlineStyle(), blockType: RichUtils.getCurrentBlockType(editorState) })
+  }, [editorState]);
+
+  const handleCommanStringRemoval = (focusOffset:number, anchorKey:string, currentContent:ContentState) => {
+    const selectionToRemove = new SelectionState({
+      anchorKey,
+      focusKey: anchorKey,
+      anchorOffset: 0,
+      focusOffset,
+      isBackward: false,
+      hasFocus: false
+    });
+    const contentState = Modifier.replaceText(currentContent, selectionToRemove, "");
+    const modifiedEditorState = EditorState.createWithContent(contentState);
+    const newEditorState = EditorState.moveFocusToEnd(modifiedEditorState);
+    setEditorState(newEditorState);
   }
 
   const keyBindingFn = (e: SyntheticKeyboardEvent): string | null => {
@@ -43,20 +72,19 @@ function App() {
     const hasCmdModifier = hasCommandModifier(e);
     if(hasCmdModifier && e.key === "s") e.preventDefault();
 
-    const currentContent = editorState.getCurrentContent();
-    const selectionState = editorState.getSelection();
-    const anchorKey = selectionState.getAnchorKey();
-    const currentContentBlock = currentContent.getBlockForKey(anchorKey);
-    console.log(currentContentBlock.getText());
-
-    console.log(hasCmdModifier, e, e.key)
     switch(e.key) {
       case "s": {
         if(hasCmdModifier) {
-          console.log("ctrl + s")
+          // console.log("ctrl + s")
           return "save";
         }
         return null;
+      }
+      case "Enter": {
+        const currentBlockType = RichUtils.getCurrentBlockType(editorState);
+        const newEditorState = RichUtils.toggleBlockType(editorState, currentBlockType);
+        if(newEditorState) setEditorState(newEditorState);
+        return getDefaultKeyBinding(e);
       }
       case " ": {
         const selectionState = editorState.getSelection();
@@ -69,28 +97,32 @@ function App() {
         if(currentBlockText.length === 1 && currentBlockText === "#") {
           const newState = RichUtils.toggleBlockType(editorState, "header-one");
           setEditorState(newState);
-        } else if(currentBlockText.length > 1 && currentBlockText[0] === "#") {
-          if(currentBlockText.startsWith("# ")) {
-            console.log("starts with #space")
-          }
-          const selectionToRemove = new SelectionState({
-            anchorKey,
-            focusKey: anchorKey,
-            anchorOffset: 0,
-            focusOffset: 2,
-            isBackward: false,
-            hasFocus: false
-          });
-          const contentState = Modifier.replaceText(currentContent, selectionToRemove, "");
-          const modifiedEditorState = EditorState.createWithContent(contentState);
-          const newEditorState = EditorState.moveFocusToEnd(modifiedEditorState);
-          setEditorState(newEditorState);
-          console.log(newEditorState);
+        } else if(currentBlockText.length > 1 && currentBlockText.startsWith("# ")) {
+          handleCommanStringRemoval(2, anchorKey, currentContent)
         }
 
         // For Bold Text
         if(currentBlockText.length === 1 && currentBlockText === "*") { 
+          const newEditorState = RichUtils.toggleInlineStyle(editorState, "BOLD");
+          setEditorState(newEditorState);
+        } else if(currentBlockText.length > 1 && currentBlockText.startsWith("* ")) { 
+          handleCommanStringRemoval(2, anchorKey, currentContent)
+        }
 
+        // For red text.
+        if(currentBlockText.length === 2 && currentBlockText === "**") { 
+          const newEditorState = RichUtils.toggleInlineStyle(editorState, "red-text");
+          setEditorState(newEditorState);
+        } else if(currentBlockText.length > 1 && currentBlockText.startsWith("** ")) { 
+          handleCommanStringRemoval(3, anchorKey, currentContent);
+        }
+
+        // For underlined text
+        if(currentBlockText.length === 3 && currentBlockText === "***") {
+          const newEditorState = RichUtils.toggleInlineStyle(editorState, "UNDERLINE");
+          setEditorState(newEditorState);
+        } else if(currentBlockText.length > 1 && currentBlockText.startsWith("*** ")) { 
+          handleCommanStringRemoval(4, anchorKey, currentContent);
         }
       }
       default: {
@@ -109,12 +141,23 @@ function App() {
     return "not-handled";
   }
 
+  const handleSaveBtnClick = (e: any) => {
+    const raw = convertToRaw(editorState.getCurrentContent());
+    const jsonString = JSON.stringify(raw);
+    localStorage.setItem("draft-js-raw", jsonString);
+  }
+
   return (
     <div className="app-div">
       <div className="heading-and-save-btn-container">
         <h1 className="heading-h1">Demo Editor by Narendra</h1>
         <div className="save-btn-container">
-          <button className="save-btn">Save</button>
+          <button
+            className="save-btn"
+            onClick={handleSaveBtnClick}
+          >
+            Save
+          </button>
         </div>
       </div>
       <div 
@@ -125,9 +168,10 @@ function App() {
           ref={editorRef} 
           onChange={setEditorState}
           editorState={editorState}       
-          handleReturn={handleEnterClick}
           handleKeyCommand={handleKeyCommand}
-          keyBindingFn={keyBindingFn}
+          keyBindingFn={keyBindingFn}         
+          customStyleMap={customStyleMap}
+          handleReturn={handleEnterClick}
         />
       </div>
     </div>
